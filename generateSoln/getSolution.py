@@ -1,28 +1,27 @@
 #!/usr/bin/python
 
+from datetime import datetime
 from scipy import interpolate
 import numpy as np
 import h5py as hp
 
-L = 1.0, 1.0, 1.0
+L = 1.0, 0.25, 1.0
 
 # Input file params
-inpTime = 0
+inpTime = 675
 nInp = 64, 64, 64
 betaInp = 1.2, 1.2, 1.2
 
 # Output file params
-outTime = 0
-nOut = 128, 128, 128
+outTime = 320
+nOut = 256, 128, 256
 betaOut = 1.3, 1.3, 1.3
-
-rstTime = 0
 
 
 def makeGrids():
+    global inpTime
     global L, xInp, xOut
-    global inpTime, nInp, betaInp
-    global outTime, nOut, betaOut
+    global nOut, betaOut, nInp, betaInp
 
     xInp = []
     xOut = []
@@ -31,10 +30,21 @@ def makeGrids():
 
         sFile = hp.File(fileName, 'r')
 
-        xInp.append(np.array(sFile["X"]))
-        xInp.append(np.array(sFile["Y"]))
-        xInp.append(np.array(sFile["Z"]))
+        gridAxes = ["X", "Y", "Z"]
+        nTmp = list(nInp)
+        for i in range(3):
+            gData = np.array(sFile[gridAxes[i]])
+            nTmp[i] = gData.shape[0]
 
+            gData = np.pad(gData, 1)
+            gData[-1] = L[i]
+
+            if gData[-1] - gData[-2] > 5*(gData[-2] - gData[-3]):
+                print("WARNING: There could be a domain length mismatch along axis " + gridAxes[i])
+
+            xInp.append(gData)
+
+        nInp = tuple(nTmp)
         sFile.close()
     else:
         for i in range(3):
@@ -43,7 +53,7 @@ def makeGrids():
             if betaInp[i]:
                 xInp.append(np.array([L[i]*(1.0 - np.tanh(betaInp[i]*(1.0 - 2.0*x))/np.tanh(betaInp[i]))/2.0 for x in xi]))
             else:
-                xInp.append(np.copy(xi))
+                xInp.append(L[i]*xi)
 
     for i in range(3):
         xi = transGen(nOut[i])
@@ -51,7 +61,7 @@ def makeGrids():
         if betaOut[i]:
             xOut.append(np.array([L[i]*(1.0 - np.tanh(betaOut[i]*(1.0 - 2.0*x))/np.tanh(betaOut[i]))/2.0 for x in xi[1:-1]]))
         else:
-            xOut.append(np.copy(xi[1:-1]))
+            xOut.append(L[i]*xi[1:-1])
 
 
 def transGen(N):
@@ -65,8 +75,8 @@ def transGen(N):
 
 
 def loadData():
-    global inpTime
     global nInp, nOut
+    global inpTime, outTime
     global uInp, vInp, wInp, tInp, pInp
     global uOut, vOut, wOut, tOut, pOut
 
@@ -96,7 +106,7 @@ def loadData():
     tInp[1:-1, 1:-1, 1:-1] = np.array(f['T'])
 
     if not outTime:
-        rstTime = np.array(f['Time'])
+        outTime = np.array(f['Time'])
 
     f.close()
 
@@ -120,6 +130,8 @@ def imposeBCs():
     pInp[:, -1, :] = pInp[:, -2, :]
     pInp[:, :, -1] = pInp[:, :, -2]
 
+    # WARNING: Below BCs are for RBC only.
+    # Stably stratified flows may require changes to below code.
     tInp[0, :, :] = tInp[1, :, :]
     tInp[:, 0, :] = tInp[:, 1, :]
     tInp[:, :, 0] = 1.0
@@ -130,15 +142,16 @@ def imposeBCs():
 
 
 def xInterp(fInp):
+    global nOut
     global xInp, xOut
 
-    lOut, mOut, nOut = fInp.shape
-    lOut = Nx
+    l, m, n = fInp.shape
+    l = nOut[0]
 
-    fOut = np.zeros((lOut, mOut, nOut))
+    fOut = np.zeros((l, m, n))
 
-    for j in range(mOut):
-        for k in range(nOut):
+    for j in range(m):
+        for k in range(n):
             intFunct = interpolate.interp1d(xInp[0], fInp[:, j, k], kind='cubic')
             fOut[:, j, k] = intFunct(xOut[0])
 
@@ -146,15 +159,16 @@ def xInterp(fInp):
 
 
 def yInterp(fInp):
+    global nOut
     global xInp, xOut
 
-    lOut, mOut, nOut = fInp.shape
-    mOut = Ny
+    l, m, n = fInp.shape
+    m = nOut[1]
 
-    fOut = np.zeros((lOut, mOut, nOut))
+    fOut = np.zeros((l, m, n))
 
-    for i in range(lOut):
-        for k in range(nOut):
+    for i in range(l):
+        for k in range(n):
             intFunct = interpolate.interp1d(xInp[1], fInp[i, :, k], kind='cubic')
             fOut[i, :, k] = intFunct(xOut[1])
 
@@ -162,15 +176,16 @@ def yInterp(fInp):
 
 
 def zInterp(fInp):
+    global nOut
     global xInp, xOut
 
-    lOut, mOut, nOut = fInp.shape
-    nOut = Nz
+    l, m, n = fInp.shape
+    n = nOut[2]
 
-    fOut = np.zeros((lOut, mOut, nOut))
+    fOut = np.zeros((l, m, n))
 
-    for i in range(lOut):
-        for j in range(mOut):
+    for i in range(l):
+        for j in range(m):
             intFunct = interpolate.interp1d(xInp[2], fInp[i, j, :], kind='cubic')
             fOut[i, j, :] = intFunct(xOut[2])
 
@@ -183,27 +198,33 @@ def interpData():
 
     print("Interpolating Vx")
     uOut = zInterp(yInterp(xInterp(uInp)))
+    #uOut = xInterp(yInterp(zInterp(uInp)))
 
     print("Interpolating Vy")
     vOut = zInterp(yInterp(xInterp(vInp)))
+    #vOut = xInterp(yInterp(zInterp(vInp)))
 
     print("Interpolating Vz")
     wOut = zInterp(yInterp(xInterp(wInp)))
+    #wOut = xInterp(yInterp(zInterp(wInp)))
 
     print("Interpolating P")
     pOut = zInterp(yInterp(xInterp(pInp)))
+    #pOut = xInterp(yInterp(zInterp(pInp)))
 
     print("Interpolating T")
     tOut = zInterp(yInterp(xInterp(tInp)))
+    #tOut = xInterp(yInterp(zInterp(tInp)))
 
 
 def writeFile():
-    global restartTime
+    global xOut
+    global outTime
     global uOut, vOut, wOut, tOut, pOut
 
-    fileName = "newRestart.h5"
+    fileName = "Soln_{0:09.4f}.h5".format(outTime)
 
-    print("Writing into file " + fileName + "\n")
+    print("\nWriting into file " + fileName)
 
     try:
         f = hp.File(fileName, 'w')
@@ -216,7 +237,12 @@ def writeFile():
     dset = f.create_dataset("Vz", data = wOut)
     dset = f.create_dataset("P", data = pOut)
     dset = f.create_dataset("T", data = tOut)
-    dset = f.create_dataset("Time", data = restartTime)
+
+    dset = f.create_dataset("X", data = xOut[0])
+    dset = f.create_dataset("Y", data = xOut[1])
+    dset = f.create_dataset("Z", data = xOut[2])
+
+    dset = f.create_dataset("Time", data = outTime)
 
     f.close()
 
@@ -224,8 +250,14 @@ def writeFile():
 def main():
     makeGrids()
     loadData()
+
+    t1 = datetime.now()
     interpData()
+    t2 = datetime.now()
+
     writeFile()
+
+    print("\nTime taken for interpolation = ", t2 - t1)
 
 
 main()
