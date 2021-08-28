@@ -11,18 +11,30 @@ plt.rcParams["font.family"] = "Times New Roman"
 plt.rcParams["mathtext.fontset"] = 'cm'
 plt.rcParams["font.weight"] = "medium"
 
+# Available variables for plotting
+nArray = ['xVel', 'yVel', 'zVel', 'Pres', 'Temp']
+
+# Choose variable to be plotted as the index corresponding to it in above arrays
+plotVar = 4
+
 def loadData(fileName):
+    global plotVar
     global U, V, W, P, T, X, Y, Z
 
     print("Reading from file ", fileName)
     sFile = hp.File(fileName, 'r')
 
-    #U = np.array(sFile["Vx"])
-    #V = np.array(sFile["Vy"])
-    #W = np.array(sFile["Vz"])
-    #P = np.array(sFile["P"])
-    U, V, W, P = 1, 1, 1, 1
-    T = np.array(sFile["T"])
+    U, V, W, P, T = 1, 1, 1, 1, 1
+    if plotVar == 0:
+        U = np.array(sFile["Vx"])
+    elif plotVar == 1:
+        V = np.array(sFile["Vy"])
+    elif plotVar == 2:
+        W = np.array(sFile["Vz"])
+    elif plotVar == 3:
+        P = np.array(sFile["P"])
+    elif plotVar == 4:
+        T = np.array(sFile["T"])
 
     X = np.array(sFile["X"])
     Y = np.array(sFile["Y"])
@@ -36,8 +48,6 @@ def plotFile(iStr, iEnd):
     global U, V, W, P, T, X, Y, Z
 
     vArray = [U, V, W, P, T]
-    nArray = ['xVel', 'yVel', 'zVel', 'Pres', 'Temp']
-
     X1, Z1 = np.meshgrid(X, Z)
     for i in range(iStr, iEnd):
         fig = plt.figure(figsize=(20, 8))

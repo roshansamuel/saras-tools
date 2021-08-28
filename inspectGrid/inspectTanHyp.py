@@ -14,21 +14,6 @@ zStag = np.array([zLen*(1.0 - np.tanh(zBeta*(1.0 - 2.0*i))/np.tanh(zBeta))/2.0 f
 
 print(zStag[:6])
 
-a = -zStag[0]
-b = zStag[1]
-l = a + b
-cwal = l/b
-cvar = a/b
-print(cwal, cvar)
-'''
-c = zStag[3] - zStag[2]
-b = zStag[2] - zStag[1]
-a = b*b/c
-zStag[0] = zStag[1] - a
-print(zStag[:4])
-print(b, c, a)
-'''
-
 minLength = zStag[1] - zStag[0]
 maxLength = zStag[Nz//2] - zStag[Nz//2 - 1]
 aspectRat = maxLength/minLength
