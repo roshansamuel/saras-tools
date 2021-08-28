@@ -4,45 +4,54 @@ from scipy import interpolate
 import numpy as np
 import h5py as hp
 
-Lx, Ly, Lz = 1.0, 1.0, 1.0
+L = 1.0, 1.0, 1.0
 
 # Input file params
-nx, ny, nz = 64, 64, 64
-betaInp = 1.2
+inpTime = 0
+nInp = 64, 64, 64
+betaInp = 1.2, 1.2, 1.2
 
 # Output file params
-Nx, Ny, Nz = 128, 128, 128
-betaOut = 1.3
+outTime = 0
+nOut = 128, 128, 128
+betaOut = 1.3, 1.3, 1.3
+
+rstTime = 0
+
 
 def makeGrids():
-    global xInp, yInp, zInp
-    global xOut, yOut, zOut
+    global L, xInp, xOut
+    global inpTime, nInp, betaInp
+    global outTime, nOut, betaOut
 
-    xiInp = transGen(nx)
-    etInp = transGen(ny)
-    ztInp = transGen(nz)
+    xInp = []
+    xOut = []
+    if inpTime:
+        fileName = "Soln_{0:09.4f}.h5".format(inpTime)
 
-    xiOut = transGen(Nx)
-    etOut = transGen(Ny)
-    ztOut = transGen(Nz)
+        sFile = hp.File(fileName, 'r')
 
-    if betaInp:
-        xInp = np.array([Lx*(1.0 - np.tanh(betaInp*(1.0 - 2.0*i))/np.tanh(betaInp))/2.0 for i in xiInp])
-        yInp = np.array([Ly*(1.0 - np.tanh(betaInp*(1.0 - 2.0*i))/np.tanh(betaInp))/2.0 for i in etInp])
-        zInp = np.array([Lz*(1.0 - np.tanh(betaInp*(1.0 - 2.0*i))/np.tanh(betaInp))/2.0 for i in ztInp])
+        xInp.append(np.array(sFile["X"]))
+        xInp.append(np.array(sFile["Y"]))
+        xInp.append(np.array(sFile["Z"]))
+
+        sFile.close()
     else:
-        xInp = np.copy(xiInp)
-        yInp = np.copy(etInp)
-        zInp = np.copy(ztInp)
+        for i in range(3):
+            xi = transGen(nInp[i])
 
-    if betaOut:
-        xOut = np.array([Lx*(1.0 - np.tanh(betaOut*(1.0 - 2.0*i))/np.tanh(betaOut))/2.0 for i in xiOut[1:-1]])
-        yOut = np.array([Ly*(1.0 - np.tanh(betaOut*(1.0 - 2.0*i))/np.tanh(betaOut))/2.0 for i in etOut[1:-1]])
-        zOut = np.array([Lz*(1.0 - np.tanh(betaOut*(1.0 - 2.0*i))/np.tanh(betaOut))/2.0 for i in ztOut[1:-1]])
-    else:
-        xOut = np.copy(xiOut[1:-1])
-        yOut = np.copy(etOut[1:-1])
-        zOut = np.copy(ztOut[1:-1])
+            if betaInp[i]:
+                xInp.append(np.array([L[i]*(1.0 - np.tanh(betaInp[i]*(1.0 - 2.0*x))/np.tanh(betaInp[i]))/2.0 for x in xi]))
+            else:
+                xInp.append(np.copy(xi))
+
+    for i in range(3):
+        xi = transGen(nOut[i])
+
+        if betaOut[i]:
+            xOut.append(np.array([L[i]*(1.0 - np.tanh(betaOut[i]*(1.0 - 2.0*x))/np.tanh(betaOut[i]))/2.0 for x in xi[1:-1]]))
+        else:
+            xOut.append(np.copy(xi[1:-1]))
 
 
 def transGen(N):
@@ -56,11 +65,15 @@ def transGen(N):
 
 
 def loadData():
-    global restartTime
+    global inpTime
+    global nInp, nOut
     global uInp, vInp, wInp, tInp, pInp
     global uOut, vOut, wOut, tOut, pOut
 
-    fileName = "restartFile.h5"
+    if inpTime:
+        fileName = "Soln_{0:09.4f}.h5".format(inpTime)
+    else:
+        fileName = "restartFile.h5"
 
     print("Reading file " + fileName + "\n")
 
@@ -70,28 +83,30 @@ def loadData():
         print("Could not open file " + fileName + "\n")
         exit()
 
-    uInp = np.zeros((nx + 2, ny + 2, nz + 2))
-    vInp = np.zeros((nx + 2, ny + 2, nz + 2))
-    wInp = np.zeros((nx + 2, ny + 2, nz + 2))
-    pInp = np.zeros((nx + 2, ny + 2, nz + 2))
-    tInp = np.zeros((nx + 2, ny + 2, nz + 2))
+    uInp = np.zeros(tuple([nInp[i] + 2 for i in range(3)]))
+    vInp = np.zeros(tuple([nInp[i] + 2 for i in range(3)]))
+    wInp = np.zeros(tuple([nInp[i] + 2 for i in range(3)]))
+    pInp = np.zeros(tuple([nInp[i] + 2 for i in range(3)]))
+    tInp = np.zeros(tuple([nInp[i] + 2 for i in range(3)]))
 
     uInp[1:-1, 1:-1, 1:-1] = np.array(f['Vx'])
     vInp[1:-1, 1:-1, 1:-1] = np.array(f['Vy'])
     wInp[1:-1, 1:-1, 1:-1] = np.array(f['Vz'])
     pInp[1:-1, 1:-1, 1:-1] = np.array(f['P'])
     tInp[1:-1, 1:-1, 1:-1] = np.array(f['T'])
-    restartTime = np.array(f['Time'])
+
+    if not outTime:
+        rstTime = np.array(f['Time'])
 
     f.close()
 
     imposeBCs()
 
-    uOut = np.zeros((Nx, Ny, Nz))
-    vOut = np.zeros((Nx, Ny, Nz))
-    wOut = np.zeros((Nx, Ny, Nz))
-    pOut = np.zeros((Nx, Ny, Nz))
-    tOut = np.zeros((Nx, Ny, Nz))
+    uOut = np.zeros(nOut)
+    vOut = np.zeros(nOut)
+    wOut = np.zeros(nOut)
+    pOut = np.zeros(nOut)
+    tOut = np.zeros(nOut)
 
 
 def imposeBCs():
@@ -124,14 +139,14 @@ def xInterp(fInp):
 
     for j in range(mOut):
         for k in range(nOut):
-            intFunct = interpolate.interp1d(xInp, fInp[:, j, k], kind='cubic')
-            fOut[:, j, k] = intFunct(xOut)
+            intFunct = interpolate.interp1d(xInp[0], fInp[:, j, k], kind='cubic')
+            fOut[:, j, k] = intFunct(xOut[0])
 
     return fOut
 
 
 def yInterp(fInp):
-    global yInp, yOut
+    global xInp, xOut
 
     lOut, mOut, nOut = fInp.shape
     mOut = Ny
@@ -140,14 +155,14 @@ def yInterp(fInp):
 
     for i in range(lOut):
         for k in range(nOut):
-            intFunct = interpolate.interp1d(yInp, fInp[i, :, k], kind='cubic')
-            fOut[i, :, k] = intFunct(yOut)
+            intFunct = interpolate.interp1d(xInp[1], fInp[i, :, k], kind='cubic')
+            fOut[i, :, k] = intFunct(xOut[1])
 
     return fOut
 
 
 def zInterp(fInp):
-    global zInp, zOut
+    global xInp, xOut
 
     lOut, mOut, nOut = fInp.shape
     nOut = Nz
@@ -156,8 +171,8 @@ def zInterp(fInp):
 
     for i in range(lOut):
         for j in range(mOut):
-            intFunct = interpolate.interp1d(zInp, fInp[i, j, :], kind='cubic')
-            fOut[i, j, :] = intFunct(zOut)
+            intFunct = interpolate.interp1d(xInp[2], fInp[i, j, :], kind='cubic')
+            fOut[i, j, :] = intFunct(xOut[2])
 
     return fOut
 
