@@ -2,6 +2,7 @@
 
 from datetime import datetime
 from scipy import interpolate
+import multiprocessing as mp
 import numpy as np
 import h5py as hp
 
@@ -192,29 +193,28 @@ def zInterp(fInp):
     return fOut
 
 
-def interpData():
+def interpData(interpVar):
     global uInp, vInp, wInp, tInp, pInp
-    global uOut, vOut, wOut, tOut, pOut
 
-    print("Interpolating Vx")
-    uOut = zInterp(yInterp(xInterp(uInp)))
-    #uOut = xInterp(yInterp(zInterp(uInp)))
+    if interpVar == 0:
+        print("Interpolating Vx")
+        return xInterp(yInterp(zInterp(uInp)))
 
-    print("Interpolating Vy")
-    vOut = zInterp(yInterp(xInterp(vInp)))
-    #vOut = xInterp(yInterp(zInterp(vInp)))
+    elif interpVar == 1:
+        print("Interpolating Vy")
+        return xInterp(yInterp(zInterp(vInp)))
 
-    print("Interpolating Vz")
-    wOut = zInterp(yInterp(xInterp(wInp)))
-    #wOut = xInterp(yInterp(zInterp(wInp)))
+    elif interpVar == 2:
+        print("Interpolating Vz")
+        return xInterp(yInterp(zInterp(wInp)))
 
-    print("Interpolating P")
-    pOut = zInterp(yInterp(xInterp(pInp)))
-    #pOut = xInterp(yInterp(zInterp(pInp)))
+    elif interpVar == 3:
+        print("Interpolating P")
+        return xInterp(yInterp(zInterp(pInp)))
 
-    print("Interpolating T")
-    tOut = zInterp(yInterp(xInterp(tInp)))
-    #tOut = xInterp(yInterp(zInterp(tInp)))
+    elif interpVar == 4:
+        print("Interpolating T")
+        return xInterp(yInterp(zInterp(tInp)))
 
 
 def writeFile():
@@ -248,11 +248,18 @@ def writeFile():
 
 
 def main():
+    global uOut, vOut, wOut, tOut, pOut
+
     makeGrids()
     loadData()
 
+    # Lazy parallelism
+    nProcs = 5
+    pool = mp.Pool(processes=nProcs)
+
     t1 = datetime.now()
-    interpData()
+    poolRes = [pool.apply_async(interpData, args=(x,)) for x in range(nProcs)]
+    uOut, vOut, wOut, pOut, tOut = [x.get() for x in poolRes]
     t2 = datetime.now()
 
     writeFile()
