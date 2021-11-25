@@ -1,27 +1,40 @@
-#import matplotlib.pyplot as plt
 import numpy as np
 
-Nz = 1024
-zLen = 1.0
-zBeta = 1.3
+nList = 256, 256, 1536
+lList = 0.1, 0.1, 1.0
+bList = 1.1, 1.1, 1.3
+axesList = ['X', 'Y', 'Z']
 
-vPts = np.linspace(0.0, 1.0, Nz+1)
-zt = np.zeros(Nz + 2)
-zt[1:-1] = (vPts[1:] + vPts[:-1])/2.0
-zt[0] = zt[1] - (zt[2] - zt[1])
-zt[-1] = zt[-2] + (zt[-2] - zt[-3])
-zStag = np.array([zLen*(1.0 - np.tanh(zBeta*(1.0 - 2.0*i))/np.tanh(zBeta))/2.0 for i in zt])
+print("Current grid has total points:", format(nList[0]*nList[1]*nList[2], ',d'))
 
-print(zStag[:6])
+maxList = np.zeros(3)
+minList = np.zeros(3)
 
-minLength = zStag[1] - zStag[0]
-maxLength = zStag[Nz//2] - zStag[Nz//2 - 1]
-aspectRat = maxLength/minLength
+for n in range(3):
+    vPts = np.linspace(0.0, 1.0, nList[n]+1)
+    xi = np.zeros(nList[n] + 2)
+    xi[1:-1] = (vPts[1:] + vPts[:-1])/2.0
+    xi[0] = xi[1] - (xi[2] - xi[1])
+    xi[-1] = xi[-2] + (xi[-2] - xi[-3])
 
-print("Current grid has minimum spacing of", minLength)
-print("Current grid has maximum spacing of", maxLength)
-print("Current grid has aspect ratio of", aspectRat)
+    if bList[n]:
+        xGrid = np.array([lList[n]*(1.0 - np.tanh(bList[n]*(1.0 - 2.0*i))/np.tanh(bList[n]))/2.0 for i in xi])
+        minList[n] = xGrid[1] - xGrid[0]
+        maxList[n] = xGrid[nList[n]//2] - xGrid[nList[n]//2 - 1]
 
-zDiff = zStag[1:] - zStag[:-1]
-#plt.plot(zDiff)
-#plt.show()
+        print("Maximum spacing along " + axesList[n] + " is", maxList[n])
+        print("Minimum spacing along " + axesList[n] + " is", minList[n])
+    else:
+        minList[n] = maxList[n] = lList[n]/nList[n]
+        print("Uniform spacing along " + axesList[n] + " is", minList[n])
+
+
+arList = [maxList[0]/minList[1],
+          maxList[0]/minList[2],
+          maxList[1]/minList[2],
+          maxList[1]/minList[0],
+          maxList[2]/minList[0],
+          maxList[2]/minList[1]]
+
+print("Current grid has maximum aspect ratio:", max(arList))
+
