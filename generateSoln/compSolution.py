@@ -90,7 +90,7 @@ def plotVert(vNum):
         ax = fig.add_subplot(1, 2, 2)
         im = ax.contourf(X2, Z2, t2[:, i, :].transpose(), cmap=cm.jet)
 
-        plt.savefig(nArray[vNum - 1] + "_Vert_{0:04d}.png".format(i))
+        plt.savefig(nArray[vNum - 1] + "_Vert_{0:04d}.png".format(n))
         plt.close()
 
     return 0
