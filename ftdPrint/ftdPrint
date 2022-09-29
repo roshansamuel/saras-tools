@@ -1,0 +1,20 @@
+#!/usr/bin/env python3
+
+import subprocess as sp
+import datetime as dt
+
+proc = sp.Popen(['ls -htral --full-time Soln*'], stdout=sp.PIPE, stderr=sp.PIPE, shell=True)
+o, e = proc.communicate()
+
+ol = o.decode('ascii').split('\n')[:-1]
+tl = []
+for el in ol:
+    spList = el.split(' ')
+    sTime = spList[5] + " " + spList[6][:-3]
+    tl.append((spList[-1], dt.datetime.strptime(sTime, "%Y-%m-%d %H:%M:%S.%f")))
+
+print(tl[0][0] + "\t{0:.2f}".format(0.0))
+for i in range(1, len(tl)):
+    tdel = tl[i][1] - tl[i-1][1]
+    secs = tdel.total_seconds()
+    print(tl[i][0] + "\t{0:.2f}".format(secs))
