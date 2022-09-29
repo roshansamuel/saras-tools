@@ -18,3 +18,11 @@ for i in range(1, len(tl)):
     tdel = tl[i][1] - tl[i-1][1]
     secs = tdel.total_seconds()
     print(tl[i][0] + "\t{0:.2f}".format(secs))
+
+print()
+nft = tl[-1][1] + tdel - dt.datetime.now()
+tots = nft.total_seconds()
+hrs = tots // 3600
+mns = (tots % 3600) // 60
+scs = tots % 60
+print("Approximate time to next file: {0:3d}:{1:02d}:{2:02d}".format(int(hrs), int(mns), int(scs)))
