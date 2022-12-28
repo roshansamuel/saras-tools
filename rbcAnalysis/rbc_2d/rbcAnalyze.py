@@ -45,15 +45,26 @@ def loadData(fileName):
 
 def imposeBCs():
     # Periodic along X
-    glob.X[0], glob.X[-1] = -glob.X[1], glob.Lx + glob.X[1]
     glob.U[0,:], glob.U[-1,:] = glob.U[-2,:], glob.U[1,:]
     glob.W[0,:], glob.W[-1,:] = glob.W[-2,:], glob.W[1,:]
     glob.P[0,:], glob.P[-1,:] = glob.P[-2,:], glob.P[1,:]
     glob.T[0,:], glob.T[-1,:] = glob.T[-2,:], glob.T[1,:]
 
     # RBC
-    glob.P[:,0], glob.P[:,-1] = glob.P[:,1], glob.P[:,-2]
-    glob.T[:,0], glob.T[:,-1] = 1.0, 0.0
+    glob.U[:,0], glob.U[:,-1] = -glob.U[:,1], -glob.U[:,-2]
+    glob.W[:,0], glob.W[:,-1] = -glob.W[:,1], -glob.W[:,-2]
+    glob.P[:,0], glob.P[:,-1] =  glob.P[:,1],  glob.P[:,-2]
+    glob.T[:,0], glob.T[:,-1] = 2.0 - glob.T[:,1], -glob.T[:,-2]
+
+    if np.allclose(glob.X[1:-1], glob.xPts[1:-1]):
+        glob.X = glob.xPts.copy()
+    else:
+        print("\tWARNING: Grids are inconsistent along X")
+
+    if np.allclose(glob.Z[1:-1], glob.zPts[1:-1]):
+        glob.Z = glob.zPts.copy()
+    else:
+        print("\tWARNING: Grids are inconsistent along Z")
 
 
 def getTerms():
@@ -99,36 +110,43 @@ def main():
     # Load timelist
     tList = np.loadtxt(glob.dataDir + "output/timeList.dat", comments='#')
 
+    ######################## DEBUG ########################
+    '''
     # Test function
-    fig, ax = plt.subplots(1, 2, figsize=(21,5))
-
     x, z = sp.symbols('x z')
     fsymp = sp.cos(x)*sp.sin(z) + sp.cos(x)*sp.sin(2*z) + 2*sp.cos(2*x)*sp.sin(3*z)
     #fsymp = sp.sin(5*x) + sp.cos(3*z)
     flmbd = sp.lambdify([x, z], fsymp, "numpy")
 
-    grd2fsymp = sp.diff(sp.diff(fsymp, x), x)# + sp.diff(sp.diff(fsymp, z), z)
+    grd2fsymp = sp.diff(sp.diff(fsymp, x), x) + sp.diff(sp.diff(fsymp, z), z)
+    #grd2fsymp = sp.diff(fsymp, x) + sp.diff(fsymp, z)
     grd2flmbd = sp.lambdify([x, z], grd2fsymp, "numpy")
 
     X, Z = np.meshgrid(glob.xPts, glob.zPts, indexing='ij')
 
     f = flmbd(X, Z)
     grd2fAn = grd2flmbd(X, Z)
-    im1 = ax[0].contourf(X, Z, grd2fAn)
-    plt.colorbar(im1, ax=ax[0])
-
-    grd2fCm = df.d2fx2(f)# + df.d2fz2(f)
-    im2 = ax[1].contourf(X[3:-3, 3:-3], Z[3:-3, 3:-3], grd2fCm[3:-3, 3:-3])
-    #im2 = ax[1].contourf(X, Z, grd2fCm)
-    plt.colorbar(im2, ax=ax[1])
+    grd2fCm = df.d2fx2(f) + df.d2fz2(f)
+    #grd2fCm = df.dfx(f) + df.dfz(f)
 
     grdDiff = grd2fAn - grd2fCm
-    print(np.max(grdDiff[256:512, 128:256]))
-    #exit()
+    print(np.max(np.abs(grdDiff)))
+
+    fig, ax = plt.subplots(1, 1, figsize=(12,10))
+    ax.plot(glob.xPts, grd2fAn[:, 128], marker='o')
+    ax.plot(glob.xPts, grd2fCm[:, 128], marker='o')
+
+    #fig, ax = plt.subplots(1, 2, figsize=(21,5))
+    #im1 = ax[0].contourf(X, Z, grd2fAn)
+    #plt.colorbar(im1, ax=ax[0])
+    #im2 = ax[1].contourf(X, Z, grd2fCm)
+    #plt.colorbar(im2, ax=ax[1])
 
     plt.tight_layout()
     plt.show()
     exit()
+    '''
+    ###################### END DEBUG ######################
 
     cTS = []
     for i in range(tList.shape[0]):

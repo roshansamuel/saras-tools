@@ -35,8 +35,6 @@ if readYAML:
 
 yr.updateDissCoeffs()
 
-tVol = Lx*Lz
-
 dXi = 1.0/(Nx)
 dZt = 1.0/(Nz)
 
@@ -49,6 +47,8 @@ ihz2 = 1.0/(dZt**2.0)
 def genGrid(N, L, bt):
     vPts = np.linspace(0.0, 1.0, N+1)
     xi = np.pad((vPts[1:] + vPts[:-1])/2.0, (1, 1), 'constant', constant_values=(0.0, 1.0))
+    xi[0] = -xi[1]
+    xi[-1] = 1.0 + xi[1]
     if bt:
         xPts = np.array([L*(1.0 - np.tanh(bt*(1.0 - 2.0*i))/np.tanh(bt))/2.0 for i in xi])
         xi_x = np.array([np.tanh(bt)/(L*bt*(1.0 - ((1.0 - 2.0*k/L)*np.tanh(bt))**2.0)) for k in xPts])
@@ -67,3 +67,5 @@ zt, zPts, zt_z, ztzz, ztz2 = genGrid(Nz, Lz, btZ)
 
 npax = np.newaxis
 xi_x, xixx, xix2 = xi_x[:, npax], xixx[:, npax], xix2[:, npax]
+
+tVol = (xPts[-1] - xPts[0])*(zPts[-1] - zPts[0])
