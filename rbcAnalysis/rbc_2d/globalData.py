@@ -17,6 +17,9 @@ Pr = 1.0
 Ra = 1e1
 nu, kappa = 1.0, 1.0
 
+# Compute profiles or perform analysis
+getProfs = True
+
 # Use theta (temperature fluctuation) instead of T (temperature)
 useTheta = True
 

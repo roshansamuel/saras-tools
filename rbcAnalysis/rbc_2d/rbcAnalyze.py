@@ -12,9 +12,6 @@ import matplotlib.pyplot as plt
 import scipy.integrate as integrate
 from scipy.optimize import curve_fit
 
-# Debug
-import sympy as sp
-
 mpl.style.use('classic')
 
 # Pyplot-specific directives
@@ -37,10 +34,6 @@ def loadData(fileName):
     sFile.close()
 
     imposeBCs()
-
-    # Subtract mean profile
-    if glob.useTheta:
-        glob.T -= (1 - glob.Z)
 
 
 def imposeBCs():
@@ -105,68 +98,79 @@ def main():
         glob.startTime = float(argList[0])
         glob.stopTime = float(argList[1])
 
-    ofName = "rbc_analysis_{0:06.2f}_{1:06.2f}.dat".format(glob.startTime, glob.stopTime)
+    ofSuffix = "_{0:06.2f}_{1:06.2f}".format(glob.startTime, glob.stopTime)
 
     # Load timelist
     tList = np.loadtxt(glob.dataDir + "output/timeList.dat", comments='#')
 
-    ######################## DEBUG ########################
-    '''
-    # Test function
-    x, z = sp.symbols('x z')
-    fsymp = sp.cos(x)*sp.sin(z) + sp.cos(x)*sp.sin(2*z) + 2*sp.cos(2*x)*sp.sin(3*z)
-    #fsymp = sp.sin(5*x) + sp.cos(3*z)
-    flmbd = sp.lambdify([x, z], fsymp, "numpy")
+    if glob.getProfs:
+        uAvg = []
+        wAvg = []
+        tAvg = []
+        tRMS = []
+        uRMS = []
+        tLst = []
+    else:
+        cTS = []
 
-    grd2fsymp = sp.diff(sp.diff(fsymp, x), x) + sp.diff(sp.diff(fsymp, z), z)
-    #grd2fsymp = sp.diff(fsymp, x) + sp.diff(fsymp, z)
-    grd2flmbd = sp.lambdify([x, z], grd2fsymp, "numpy")
-
-    X, Z = np.meshgrid(glob.xPts, glob.zPts, indexing='ij')
-
-    f = flmbd(X, Z)
-    grd2fAn = grd2flmbd(X, Z)
-    grd2fCm = df.d2fx2(f) + df.d2fz2(f)
-    #grd2fCm = df.dfx(f) + df.dfz(f)
-
-    grdDiff = grd2fAn - grd2fCm
-    print(np.max(np.abs(grdDiff)))
-
-    fig, ax = plt.subplots(1, 1, figsize=(12,10))
-    ax.plot(glob.xPts, grd2fAn[:, 128], marker='o')
-    ax.plot(glob.xPts, grd2fCm[:, 128], marker='o')
-
-    #fig, ax = plt.subplots(1, 2, figsize=(21,5))
-    #im1 = ax[0].contourf(X, Z, grd2fAn)
-    #plt.colorbar(im1, ax=ax[0])
-    #im2 = ax[1].contourf(X, Z, grd2fCm)
-    #plt.colorbar(im2, ax=ax[1])
-
-    plt.tight_layout()
-    plt.show()
-    exit()
-    '''
-    ###################### END DEBUG ######################
-
-    cTS = []
     for i in range(tList.shape[0]):
         tVal = tList[i]
         if tVal > glob.startTime and tVal < glob.stopTime:
             fileName = glob.dataDir + "output/Soln_{0:09.4f}.h5".format(tVal)
             loadData(fileName)
 
-            c1, c2, c3, c4, c5, c6 = getTerms()
+            if glob.getProfs:
+                vxAvg = np.mean(np.abs(glob.U), axis=0)
+                vzAvg = np.mean(np.abs(glob.W), axis=0)
+                tmAvg = np.mean(glob.T, axis=0)
+                tmRMS = np.sqrt(np.mean((glob.T - tmAvg)**2, axis=0))
+                vxRMS = np.sqrt(np.mean((glob.U - vxAvg)**2, axis=0))
 
-            # Nusselt number from eps_U using Shraiman and Siggia exact relation
-            Nu1 = 1.0 + ((glob.Lz**4)/(glob.nu**3))*((glob.Pr**2)/glob.Ra)*c5
+                uAvg.append(vxAvg)
+                wAvg.append(vzAvg)
+                tAvg.append(tmAvg)
+                tRMS.append(tmRMS)
+                uRMS.append(vxRMS)
 
-            # Nusselt number from eps_T using Shraiman and Siggia exact relation
-            Nu2 = c6*(glob.Lz**2)/glob.kappa
+                tLst.append(tVal)
 
-            cTS.append([tVal, c1, c2, c3, c4, Nu1, Nu2])
+            else:
+                # Subtract mean profile before additional calculations
+                if glob.useTheta:
+                    glob.T -= (1 - glob.Z)
 
-    cTS = np.array(cTS)
-    np.savetxt(glob.dataDir + "output/" + ofName, cTS)
+                c1, c2, c3, c4, c5, c6 = getTerms()
+
+                # Nusselt number from eps_U using Shraiman and Siggia exact relation
+                Nu1 = 1.0 + ((glob.Lz**4)/(glob.nu**3))*((glob.Pr**2)/glob.Ra)*c5
+
+                # Nusselt number from eps_T using Shraiman and Siggia exact relation
+                Nu2 = c6*(glob.Lz**2)/glob.kappa
+
+                cTS.append([tVal, c1, c2, c3, c4, Nu1, Nu2])
+
+    if glob.getProfs:
+        uAvg = np.array(uAvg)
+        wAvg = np.array(wAvg)
+        tAvg = np.array(tAvg)
+        tRMS = np.array(tRMS)
+        uRMS = np.array(uRMS)
+        tLst = np.array(tLst)
+
+        ofName = "profile_data" + ofSuffix + ".h5"
+        sFile = hp.File(glob.dataDir + "output/" + ofName, 'w')
+
+        dset = sFile.create_dataset("uAvg", data=uAvg)
+        dset = sFile.create_dataset("wAvg", data=wAvg)
+        dset = sFile.create_dataset("tAvg", data=tAvg)
+        dset = sFile.create_dataset("tRMS", data=tRMS)
+        dset = sFile.create_dataset("uRMS", data=uRMS)
+        dset = sFile.create_dataset("time", data=tLst)
+        sFile.close()
+    else:
+        cTS = np.array(cTS)
+        ofName = "rbc_analysis" + ofSuffix + ".dat"
+        np.savetxt(glob.dataDir + "output/" + ofName, cTS)
 
 
 main()
